@@ -1,168 +1,223 @@
-﻿#region (c) 2019 Gilles Macabies All right reserved
-
-// Author     : Gilles Macabies
-// Solution   : DataGridFilter
-// Projet     : DataGridFilter
+﻿// Author     : Gilles Macabies
+// Solution   : FIlterConsole
+// Projet     : FilterDataGrid
 // File       : FilterItem.cs
-// Created    : 26/01/2021
+// Created    : 02/05/2022
 //
-
-#endregion (c) 2019 Gilles Macabies All right reserved
 
 using System;
 using System.Collections.Generic;
-// ReSharper disable UnusedMember.Global
+using System.ComponentModel;
+using System.Linq;
+using System.Runtime.CompilerServices;
 
-// ReSharper disable ConvertToAutoProperty
-// ReSharper disable ConvertToAutoPropertyWhenPossible
-// ReSharper disable InconsistentNaming
-// ReSharper disable ArrangeAccessorOwnerBody
-// ReSharper disable CheckNamespace
-// ReSharper disable MemberCanBePrivate.Global
-// ReSharper disable UnusedAutoPropertyAccessor.Local
-// ReSharper disable UnusedAutoPropertyAccessor.Global
+// ReSharper disable UnusedMemberInSuper.Global
 
 namespace FilterDataGrid
 {
-    public class FilterItem : NotifyProperty
+    public interface IFilter
     {
-        #region Public Events
+        #region Public Properties
 
-        private event EventHandler<bool?> OnDateStatusChanged;
+        object Content { get; set; }
+        Type FieldType { get; set; }
+        int[] GroupIndex { get; set; }
+        bool IsChanged { get; set; }
+        bool IsPrevious { get; set; }
+        int Level { get; set; }
 
-        #endregion Public Events
+        #endregion Public Properties
+    }
 
-        #region Constructor
+    public struct GroupIndexState
+    {
+        #region Public Properties
 
-        public FilterItem(FilterCommon action = null)
-        {
-            // event subscription
-            if (action != null)
-                OnDateStatusChanged += action.UpdateTree;
-        }
+        public List<int> CheckedIndex { get; set; }
+        public object Content { get; set; }
+        public bool IsChecked { get; set; }
+        public bool IsNull { get; set; }
+        public bool IsPrevious { get; set; }
+        public List<int> PreviousIndex { get; set; }
 
-        #endregion Constructor
+        #endregion Public Properties
+    }
 
+    /// <summary>
+    ///     ListBox Item
+    /// </summary>
+    public class FilterItem : Notify, IFilter
+    {
         #region Private Fields
 
-        private bool? isChecked;
-        private bool initialized;
+        private bool initialState;
+
+        private bool isChecked;
 
         #endregion Private Fields
 
         #region Public Properties
 
-        /// <summary>
-        ///Children higher levels (years, months)
-        /// </summary>
-        public List<FilterItem> Children { get; set; }
-
-        /// <summary>
-        /// Raw value of the item (not displayed, see Label property)
-        /// </summary>
         public object Content { get; set; }
 
-        /// <summary>
-        /// Content length
-        /// </summary>
-        public int ContentLength { get; set; }
+        public int ContentLength => Content?.ToString().Length ?? 0;
 
-
-        /// <summary>
-        /// Current filter
-        /// </summary>
-        public FilterCommon CurrentFilter { get; set; }
-
-        /// <summary>
-        /// Field type
-        /// </summary>
         public Type FieldType { get; set; }
 
-        /// <summary>
-        /// Initial state
-        /// </summary>
-        public bool? InitialState { get; set; }
+        public int[] GroupIndex { get; set; }
 
-        public int Id { get; set; }
-
-        /// <summary>
-        /// State of checkbox
-        /// </summary>
-        public bool? IsChecked
+        public bool Initialize
         {
-            get => isChecked;
             set
             {
-                if (!initialized)
-                {
-                    InitialState = value;
-                    initialized = true;
-                    isChecked = value; // don't remove
-
-                    // the iteration over an Collection triggers the notification
-                    // of the "IsChecked" property and slows the performance of the loop,
-                    // the return prevents the OnPropertyChanged
-                    // notification at initialization
-                    return;
-                }
-
-                // raise event to update the date tree, see FilterCommon class
-                // only type date type fields are subscribed to the OnDateStatusChanged event
-                // OnDateStatusChanged is not triggered at tree initialization
-                if (FieldType == typeof(DateTime))
-                {
-                    OnDateStatusChanged?.Invoke(this, value);
-                }
-                else
-                {
-                    isChecked = value;
-                    OnPropertyChanged("IsChecked");
-                }
+                initialState = value;
+                isChecked = value;
             }
         }
 
-        /// <summary>
-        /// Content displayed
-        /// </summary>
-        public string Label { get; set; }
+        public bool IsChanged { get; set; }
 
-        /// <summary>
-        /// Hierarchical level for the date
-        /// </summary>
-        public int Level { get; set; }
-
-        /// <summary>
-        /// Parent of lower levels (days, months)
-        /// </summary>
-        public FilterItem Parent { get; set; }
-
-        /// <summary>
-        /// Set the state of the IsChecked property for date, does not invoke the update of the tree
-        /// </summary>
-        public bool? SetState
+        public bool IsChecked
         {
             get => isChecked;
             set
             {
                 isChecked = value;
-
-                if (!initialized)
-                {
-                    InitialState = value;
-                    initialized = true;
-                }
-                else
-                {
-                    OnPropertyChanged("IsChecked");
-                }
+                IsChanged = value != initialState;
+                OnPropertyChanged(nameof(IsChecked));
             }
         }
 
-        /// <summary>
-        /// Checks if the initial state has changed
-        /// </summary>
-        public bool Changed => isChecked != InitialState;
+        public bool IsPrevious { get; set; }
+
+        public int Level { get; set; }
 
         #endregion Public Properties
+    }
+
+    /// <summary>
+    ///     TreeView Item
+    /// </summary>
+    public class FilterItemDate : Notify, IFilter
+    {
+        #region Private Fields
+
+        private bool? initialState;
+        private bool? isChecked;
+
+        #endregion Private Fields
+
+        #region Public Properties
+
+        public List<FilterItemDate> Children { get; set; }
+
+        public object Content { get; set; }
+
+        public Type FieldType { get; set; }
+
+        public int[] GroupIndex { get; set; }
+
+        public bool? Initialize
+        {
+            set
+            {
+                initialState = value;
+                isChecked = value;
+            }
+        }
+
+        public bool IsChanged { get; set; }
+
+        public bool? IsChecked
+        {
+            get => isChecked;
+            set => SetIsChecked(value, true, true);
+        }
+
+        public bool IsPrevious { get; set; }
+
+        public FilterItem Item { get; set; }
+
+        public string Label { get; set; }
+
+        public int Level { get; set; }
+
+        public FilterItemDate Parent { get; set; }
+
+        public List<FilterItemDate> Tree { get; set; }
+
+        #endregion Public Properties
+
+        #region Private Methods
+
+        private void SetIsChecked(bool? value, bool updateChildren, bool updateParent)
+        {
+            if (value == isChecked) return;
+
+            isChecked = value;
+
+            IsChanged = initialState != isChecked;
+
+            if (Item != null)
+            {
+                Item.IsChanged = IsChanged;
+                Item.Initialize = IsChecked == true;
+            }
+
+            if (Level == 0)
+                Tree?.Skip(1).ToList().ForEach(c => { c.SetIsChecked(value, true, true); });
+
+            // state.HasValue : !null
+            if (updateChildren && isChecked.HasValue && Level != -1)
+                Children?.ForEach(c => { c.SetIsChecked(value, true, false); });
+
+            if (updateParent) Parent?.VerifyCheckedState();
+
+            OnPropertyChanged(nameof(IsChecked));
+        }
+
+        private void VerifyCheckedState()
+        {
+            bool? b = null;
+
+            for (var i = 0; i < Children.Count; ++i)
+            {
+                var item = Children[i];
+                var current = item.IsChecked;
+
+                if (i == 0)
+                {
+                    b = current;
+                }
+                else if (b != current)
+                {
+                    b = null;
+                    break;
+                }
+            }
+
+            SetIsChecked(b, false, true);
+        }
+
+        #endregion Private Methods
+    }
+
+    public class Notify : INotifyPropertyChanged
+    {
+        #region Public Events
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        #endregion Public Events
+
+        #region Protected Methods
+
+        protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
+
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        #endregion Protected Methods
     }
 }

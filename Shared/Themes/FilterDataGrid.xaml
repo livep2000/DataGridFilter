@@ -633,15 +633,18 @@
                         <!--  Row 3: (LISTBOX/TREEVIEW)  -->
                         <Grid
                             x:Name="GridItemControl" Grid.Row="3"
-                            Grid.Column="1" Margin="0,4,4,4">
+                            Grid.Column="1" Margin="0,4,4,4"
+                            DataContext="{Binding RelativeSource={RelativeSource AncestorType={x:Type control:FilterDataGrid}}}">
 
                             <ListBox
                                 x:Name="PopupListBox" Grid.Row="0"
                                 Padding="2" HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch" BorderBrush="LightGray"
-                                BorderThickness="1" ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                ScrollViewer.VerticalScrollBarVisibility="Auto" TabIndex="2"
-                                Visibility="Collapsed">
+                                VerticalAlignment="Stretch"
+                                control:ScrollToTopBehavior.ScrollToTop="True" BorderBrush="LightGray"
+                                BorderThickness="1"
+                                ItemsSource="{Binding ListBoxItems, UpdateSourceTrigger=PropertyChanged}"
+                                ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                                ScrollViewer.VerticalScrollBarVisibility="Auto" TabIndex="2">
                                 <ListBox.ItemContainerStyle>
                                     <Style BasedOn="{StaticResource {x:Type ListBoxItem}}" TargetType="{x:Type ListBoxItem}">
                                         <Setter Property="HorizontalContentAlignment" Value="Left" />
@@ -653,15 +656,13 @@
                                         <CheckBox
                                             x:Name="CheckBox" Width="Auto"
                                             HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                                            Command="{x:Static control:FilterDataGrid.IsChecked}"
-                                            CommandParameter="{Binding}"
                                             FontWeight="Normal"
                                             IsChecked="{Binding IsChecked}"
                                             IsThreeState="False">
                                             <CheckBox.Content>
                                                 <MultiBinding Converter="{StaticResource StringFormatConverter}" ConverterParameter="Culture">
                                                     <Binding Path="Translate.Neutral" RelativeSource="{RelativeSource AncestorType={x:Type control:FilterDataGrid}}" />
-                                                    <Binding Path="Label" />
+                                                    <Binding Path="Content" />
                                                     <Binding Path="Translate.Culture" RelativeSource="{RelativeSource AncestorType={x:Type control:FilterDataGrid}}" />
                                                 </MultiBinding>
                                             </CheckBox.Content>
@@ -670,19 +671,34 @@
                                             <DataTrigger Binding="{Binding Level}" Value="1">
                                                 <Setter TargetName="CheckBox" Property="Margin" Value="4,0,0,0" />
                                             </DataTrigger>
+                                            <!--  SELECT ALL  -->
+                                            <DataTrigger Binding="{Binding Level}" Value="0">
+                                                <Setter TargetName="CheckBox" Property="CommandParameter" Value="{Binding}" />
+                                                <Setter TargetName="CheckBox" Property="Command" Value="{x:Static control:FilterDataGrid.IsChecked}" />
+                                            </DataTrigger>
                                         </DataTemplate.Triggers>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
+                                <ListBox.Style>
+                                    <Style TargetType="ListBox">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ListBoxItems.Count, UpdateSourceTrigger=PropertyChanged}" Value="0">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ListBox.Style>
                             </ListBox>
 
                             <TreeView
                                 x:Name="PopupTreeview" Grid.Row="0"
                                 BorderBrush="LightGray" BorderThickness="1"
+                                ItemsSource="{Binding TreeviewItems, UpdateSourceTrigger=PropertyChanged}"
                                 ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                                ScrollViewer.VerticalScrollBarVisibility="Auto" TabIndex="2"
-                                Visibility="Collapsed">
+                                ScrollViewer.VerticalScrollBarVisibility="Auto" TabIndex="2">
                                 <TreeView.ItemTemplate>
-                                    <HierarchicalDataTemplate DataType="control:FilterItem" ItemsSource="{Binding Children}">
+                                    <HierarchicalDataTemplate DataType="control:FilterItemDate" ItemsSource="{Binding Children}">
                                         <StackPanel Orientation="Horizontal">
                                             <CheckBox
                                                 x:Name="CheckBoxTree" VerticalAlignment="Center"
@@ -706,6 +722,16 @@
                                         <Setter Property="Visibility" Value="Visible" />
                                     </Style>
                                 </TreeView.ItemContainerStyle>
+                                <TreeView.Style>
+                                    <Style TargetType="TreeView">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding TreeviewItems.Count, UpdateSourceTrigger=PropertyChanged}" Value="0">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TreeView.Style>
                             </TreeView>
                         </Grid>
 
@@ -721,14 +747,14 @@
                                 HorizontalAlignment="Left"
                                 Command="{x:Static control:FilterDataGrid.ApplyFilter}"
                                 Content="{Binding Translate.Ok}"
-                                TabIndex="3" />
+                                Cursor="Hand" TabIndex="3" />
 
                             <Button
                                 Width="100" Margin="6,0,0,0"
                                 HorizontalAlignment="Right"
                                 Command="{x:Static control:FilterDataGrid.CancelFilter}"
                                 Content="{Binding Translate.Cancel}"
-                                TabIndex="4" />
+                                Cursor="Hand" TabIndex="4" />
                         </UniformGrid>
 
                         <!--  Row 5: RESIZE GRIP  -->

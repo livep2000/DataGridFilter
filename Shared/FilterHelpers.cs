@@ -1,18 +1,15 @@
-﻿#region (c) 2019 Gilles Macabies All right reserved
-
-// Author     : Gilles Macabies
+﻿// Author     : Gilles Macabies
 // Solution   : DataGridFilter
 // Projet     : DataGridFilter
 // File       : FilterHelpers.cs
 // Created    : 20/01/2021
 //
 
-#endregion (c) 2019 Gilles Macabies All right reserved
-
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -27,29 +24,16 @@ using System.Windows.Media;
 
 namespace FilterDataGrid
 {
-
-    /// <summary>
-    /// Attached Property "FilterState" to Filter Button
-    /// </summary>
-    public class FilterState : DependencyObject
+    public static class CollectionExtentions
     {
-        #region Public Fields
-
-        public static readonly DependencyProperty IsFilteredProperty = DependencyProperty.RegisterAttached("IsFiltered",
-            typeof(bool), typeof(FilterState), new UIPropertyMetadata(false));
-
-        #endregion Public Fields
-
         #region Public Methods
 
-        public static bool GetIsFiltered(DependencyObject obj)
+        public static void DisposeSequence<T>(this IEnumerable<T> source)
         {
-            return (bool)obj.GetValue(IsFilteredProperty);
-        }
-
-        public static void SetIsFiltered(DependencyObject obj, bool value)
-        {
-            obj.SetValue(IsFilteredProperty, value);
+            foreach (IDisposable disposableObject in source.OfType<IDisposable>())
+            {
+                disposableObject.Dispose();
+            };
         }
 
         #endregion Public Methods
@@ -85,98 +69,104 @@ namespace FilterDataGrid
         #endregion Public Methods
     }
 
-    public static class VisualTreeHelpers
+    /// <summary>
+    /// ScrollBar to Top
+    /// https://itecnote.com/tecnote/r-wpf-reset-listbox-scroll-position-when-itemssource-changes/
+    /// </summary>
+    public static class ScrollToTopBehavior
     {
+        #region Public Fields
+
+        public static readonly DependencyProperty ScrollToTopProperty =
+        DependencyProperty.RegisterAttached
+        (
+            "ScrollToTop",
+            typeof(bool),
+            typeof(ScrollToTopBehavior),
+            new UIPropertyMetadata(false, OnScrollToTopPropertyChanged)
+        );
+
+        #endregion Public Fields
+
+        #region Public Methods
+
+        public static bool GetScrollToTop(DependencyObject obj)
+        {
+            return (bool)obj.GetValue(ScrollToTopProperty);
+        }
+
+        public static void SetScrollToTop(DependencyObject obj, bool value)
+        {
+            obj.SetValue(ScrollToTopProperty, value);
+        }
+
+        #endregion Public Methods
+
         #region Private Methods
 
-        public static T FindVisualChild<T>(this DependencyObject dependencyObject, string name)
-                    where T : DependencyObject
+        private static void ItemsSourceChanged(object o, EventArgs eArgs)
         {
-            // Search immediate children first (breadth-first)
-            var childrenCount = VisualTreeHelper.GetChildrenCount(dependencyObject);
+            ItemsControl itemsControl = o as ItemsControl;
 
-            //http://stackoverflow.com/questions/12304904/why-visualtreehelper-getchildrencount-returns-0-for-popup
+            if (itemsControl == null) return;
 
-            if (childrenCount == 0 && dependencyObject is Popup)
+            void EventHandler(object sender, EventArgs e)
             {
-                var popup = dependencyObject as Popup;
-                return popup.Child?.FindVisualChild<T>(name);
+                if (itemsControl.ItemContainerGenerator.Status == GeneratorStatus.ContainersGenerated)
+                {
+                    ScrollViewer scrollViewer = itemsControl.FindVisualChild<ScrollViewer>();
+                    scrollViewer.ScrollToTop();
+                    itemsControl.ItemContainerGenerator.StatusChanged -= EventHandler;
+                }
             }
 
-            for (var i = 0; i < childrenCount; i++)
-            {
-                var child = VisualTreeHelper.GetChild(dependencyObject, i);
-                var nameOfChild = child.GetValue(FrameworkElement.NameProperty) as string;
-
-                if (child is T && (name == string.Empty || name == nameOfChild))
-                    return (T)child;
-                var childOfChild = child.FindVisualChild<T>(name);
-                if (childOfChild != null)
-                    return childOfChild;
-            }
-
-            return null;
+            itemsControl.ItemContainerGenerator.StatusChanged += EventHandler;
         }
 
-        private static IEnumerable<T> GetChildrenOf<T>(this DependencyObject obj, bool recursive) where T : DependencyObject
+        private static void OnScrollToTopPropertyChanged(DependencyObject dpo, DependencyPropertyChangedEventArgs e)
         {
-            var count = VisualTreeHelper.GetChildrenCount(obj);
-            for (var i = 0; i < count; i++)
+            ItemsControl itemsControl = dpo as ItemsControl;
+
+            if (itemsControl != null)
             {
-                var child = VisualTreeHelper.GetChild(obj, i);
-                if (child is T) yield return (T)child;
+                DependencyPropertyDescriptor dependencyPropertyDescriptor =
+                        DependencyPropertyDescriptor.FromProperty(ItemsControl.ItemsSourceProperty, typeof(ItemsControl));
 
-                if (recursive)
-                    foreach (var item in child.GetChildrenOf<T>())
-                        yield return item;
+                if (dependencyPropertyDescriptor != null)
+                {
+                    if ((bool)e.NewValue)
+                    {
+                        dependencyPropertyDescriptor.AddValueChanged(itemsControl, ItemsSourceChanged);
+                    }
+                    else
+                    {
+                        dependencyPropertyDescriptor.RemoveValueChanged(itemsControl, ItemsSourceChanged);
+                    }
+                }
             }
-        }
-
-        private static IEnumerable<T> GetChildrenOf<T>(this DependencyObject obj) where T : DependencyObject
-        {
-            return obj.GetChildrenOf<T>(false);
-        }
-
-        /// <summary>
-        ///     This method is an alternative to WPF's
-        ///     <see cref="VisualTreeHelper.GetParent" /> method, which also
-        ///     supports content elements. Keep in mind that for content element,
-        ///     this method falls back to the logical tree of the element!
-        /// </summary>
-        /// <param name="child">The item to be processed.</param>
-        /// <returns>
-        ///     The submitted item's parent, if available. Otherwise
-        ///     null.
-        /// </returns>
-        private static DependencyObject GetParentObject(this DependencyObject child)
-        {
-            if (child == null) return null;
-
-            //handle content elements separately
-            var contentElement = child as ContentElement;
-            if (contentElement != null)
-            {
-                var parent = ContentOperations.GetParent(contentElement);
-                if (parent != null) return parent;
-
-                var fce = contentElement as FrameworkContentElement;
-                return fce?.Parent;
-            }
-
-            //also try searching for parent in framework elements (such as DockPanel, etc)
-            var frameworkElement = child as FrameworkElement;
-            if (frameworkElement != null)
-            {
-                var parent = frameworkElement.Parent;
-                if (parent != null) return parent;
-            }
-
-            //if it's not a ContentElement/FrameworkElement, rely on VisualTreeHelper
-            return VisualTreeHelper.GetParent(child);
         }
 
         #endregion Private Methods
+    }
 
+    public static class StopwatchExention
+    {
+        #region Public Methods
+
+        public static void Display(this Stopwatch watch, string message, bool hidden = false)
+        {
+            watch.Stop();
+            //  int length = message?.Length ?? 0;
+
+            if (hidden)
+                Debug.WriteLine($"{message}\t\tTime:{watch.Elapsed:ss\\.f}");
+        }
+
+        #endregion Public Methods
+    }
+
+    public static class VisualTreeHelpers
+    {
         #region Public Methods
 
         /// <summary>
@@ -326,6 +316,35 @@ namespace FilterDataGrid
             return foundChild;
         }
 
+        public static T FindVisualChild<T>(this DependencyObject dependencyObject, string name)
+                                                            where T : DependencyObject
+        {
+            // Search immediate children first (breadth-first)
+            var childrenCount = VisualTreeHelper.GetChildrenCount(dependencyObject);
+
+            //http://stackoverflow.com/questions/12304904/why-visualtreehelper-getchildrencount-returns-0-for-popup
+
+            if (childrenCount == 0 && dependencyObject is Popup)
+            {
+                var popup = dependencyObject as Popup;
+                return popup.Child?.FindVisualChild<T>(name);
+            }
+
+            for (var i = 0; i < childrenCount; i++)
+            {
+                var child = VisualTreeHelper.GetChild(dependencyObject, i);
+                var nameOfChild = child.GetValue(FrameworkElement.NameProperty) as string;
+
+                if (child is T && (name == string.Empty || name == nameOfChild))
+                    return (T)child;
+                var childOfChild = child.FindVisualChild<T>(name);
+                if (childOfChild != null)
+                    return childOfChild;
+            }
+
+            return null;
+        }
+
         public static T FindVisualChild<T>(this DependencyObject dependencyObject) where T : DependencyObject
         {
             return dependencyObject.FindVisualChild<T>(string.Empty);
@@ -391,6 +410,94 @@ namespace FilterDataGrid
         }
 
         #endregion Public Methods
+
+        #region Private Methods
+
+        private static IEnumerable<T> GetChildrenOf<T>(this DependencyObject obj, bool recursive) where T : DependencyObject
+        {
+            var count = VisualTreeHelper.GetChildrenCount(obj);
+            for (var i = 0; i < count; i++)
+            {
+                var child = VisualTreeHelper.GetChild(obj, i);
+                if (child is T) yield return (T)child;
+
+                if (recursive)
+                    foreach (var item in child.GetChildrenOf<T>())
+                        yield return item;
+            }
+        }
+
+        private static IEnumerable<T> GetChildrenOf<T>(this DependencyObject obj) where T : DependencyObject
+        {
+            return obj.GetChildrenOf<T>(false);
+        }
+
+        /// <summary>
+        ///     This method is an alternative to WPF's
+        ///     <see cref="VisualTreeHelper.GetParent" /> method, which also
+        ///     supports content elements. Keep in mind that for content element,
+        ///     this method falls back to the logical tree of the element!
+        /// </summary>
+        /// <param name="child">The item to be processed.</param>
+        /// <returns>
+        ///     The submitted item's parent, if available. Otherwise
+        ///     null.
+        /// </returns>
+        private static DependencyObject GetParentObject(this DependencyObject child)
+        {
+            if (child == null) return null;
+
+            //handle content elements separately
+            var contentElement = child as ContentElement;
+            if (contentElement != null)
+            {
+                var parent = ContentOperations.GetParent(contentElement);
+                if (parent != null) return parent;
+
+                var fce = contentElement as FrameworkContentElement;
+                return fce?.Parent;
+            }
+
+            //also try searching for parent in framework elements (such as DockPanel, etc)
+            var frameworkElement = child as FrameworkElement;
+            if (frameworkElement != null)
+            {
+                var parent = frameworkElement.Parent;
+                if (parent != null) return parent;
+            }
+
+            //if it's not a ContentElement/FrameworkElement, rely on VisualTreeHelper
+            return VisualTreeHelper.GetParent(child);
+        }
+
+        #endregion Private Methods
+    }
+
+    /// <summary>
+    /// Attached Property "FilterState" to Filter Button
+    /// </summary>
+    public class FilterState : DependencyObject
+    {
+        #region Public Fields
+
+        public static readonly DependencyProperty IsFilteredProperty = DependencyProperty.RegisterAttached("IsFiltered",
+            typeof(bool), typeof(FilterState), new UIPropertyMetadata(false));
+
+        #endregion Public Fields
+
+        #region Public Methods
+
+        public static bool GetIsFiltered(DependencyObject obj)
+        {
+            return (bool)obj.GetValue(IsFilteredProperty);
+        }
+
+        public static void SetIsFiltered(DependencyObject obj, bool value)
+        {
+            obj.SetValue(IsFilteredProperty, value);
+        }
+
+        #endregion Public Methods
     }
 
     /// <summary>
@@ -409,6 +516,20 @@ namespace FilterDataGrid
 
         #endregion Public Events
 
+        #region Public Methods
+
+        /// <summary>
+        ///     Raises this object's PropertyChanged event.
+        /// </summary>
+        /// <param name="propertyName">The name of the property that has a new value.</param>
+        public void OnPropertyChanged(string propertyName)
+        {
+            VerifyPropertyName(propertyName);
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        #endregion Public Methods
+
         #region Private Methods
 
         /// <summary>
@@ -426,19 +547,5 @@ namespace FilterDataGrid
         }
 
         #endregion Private Methods
-
-        #region Public Methods
-
-        /// <summary>
-        ///     Raises this object's PropertyChanged event.
-        /// </summary>
-        /// <param name="propertyName">The name of the property that has a new value.</param>
-        public void OnPropertyChanged(string propertyName)
-        {
-            VerifyPropertyName(propertyName);
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-
-        #endregion Public Methods
     }
 }
