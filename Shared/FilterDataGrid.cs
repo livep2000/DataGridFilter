@@ -1,15 +1,20 @@
-﻿// Author     : Gilles Macabies
-// Solution   : FIlterConsole
-// Projet     : FilterDataGrid
+﻿#region (c) 2022 Gilles Macabies All right reserved
+
+// Author     : Gilles Macabies
+// Solution   : FilterDataGrid
+// Projet     : FilterDataGrid.Net5.0
 // File       : FilterDataGrid.cs
-// Created    : 02/05/2022
-//
+// Created    : 30/05/2022
+// 
+
+#endregion
 
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -21,12 +26,7 @@ using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Threading;
-// ReSharper disable MemberCanBePrivate.Global
-
-// ReSharper disable UnusedMember.Global
 // ReSharper disable RedundantArgumentDefaultValue
-
-// https://michaelscodingspot.com/find-fix-and-avoid-memory-leaks-in-c-net-8-best-practices/
 
 namespace FilterDataGrid
 {
@@ -35,6 +35,43 @@ namespace FilterDataGrid
     /// </summary>
     public sealed class FilterDataGrid : DataGrid, INotifyPropertyChanged
     {
+        #region Public Constructors
+
+        /// <summary>
+        ///     FilterDataGrid constructor
+        /// </summary>
+        public FilterDataGrid()
+        {
+            DefaultStyleKey = typeof(FilterDataGrid);
+
+            Debug.WriteLineIf(IsDebugModeOn, "Constructor");
+
+            // load resources
+            var resourcesDico = new ResourceDictionary
+            {
+                Source = new Uri("/FilterDataGrid;component/Themes/FilterDataGrid.xaml",
+                    UriKind.RelativeOrAbsolute)
+            };
+
+            Resources.MergedDictionaries.Add(resourcesDico);
+
+            // initial popup size
+            popUpSize = new Point
+            {
+                X = (double)TryFindResource("PopupWidth"),
+                Y = (double)TryFindResource("PopupHeight")
+            };
+
+            CommandBindings.Add(new CommandBinding(ShowFilter, ShowFilterCommand, CanShowFilter));
+            CommandBindings.Add(new CommandBinding(ApplyFilter, ApplyFilterCommand, CanApplyFilter)); // Ok
+            CommandBindings.Add(new CommandBinding(CancelFilter, CancelFilterCommand));
+            CommandBindings.Add(new CommandBinding(RemoveFilter, RemoveFilterCommand, CanRemoveFilter));
+            CommandBindings.Add(new CommandBinding(IsChecked, CheckedAllCommand));
+            CommandBindings.Add(new CommandBinding(ClearSearchBox, ClearSearchBoxClick));
+        }
+
+        #endregion Public Constructors
+
         #region Public Fields
 
         public static readonly ICommand ApplyFilter = new RoutedCommand();
@@ -112,9 +149,8 @@ namespace FilterDataGrid
         /// <summary>
         ///     Handle Mousedown, contribution : WORDIBOI
         /// </summary>
+        // ReSharper disable once UnusedParameter.Local
         private readonly MouseButtonEventHandler onMousedown = (o, eArgs) => { eArgs.Handled = true; };
-
-        private readonly StringComparison ordinalIgnoreCase = StringComparison.OrdinalIgnoreCase;
 
         private Button button;
 
@@ -166,43 +202,6 @@ namespace FilterDataGrid
         private List<FilterItemDate> treeview;
 
         #endregion Private Fields
-
-        #region Public Constructors
-
-        /// <summary>
-        ///     FilterDataGrid constructor
-        /// </summary>
-        public FilterDataGrid()
-        {
-            DefaultStyleKey = typeof(FilterDataGrid);
-
-            Debug.WriteLineIf(IsDebugModeOn, "Constructor");
-
-            // load resources
-            var resourcesDico = new ResourceDictionary
-            {
-                Source = new Uri("/FilterDataGrid;component/Themes/FilterDataGrid.xaml",
-                    UriKind.RelativeOrAbsolute)
-            };
-
-            Resources.MergedDictionaries.Add(resourcesDico);
-
-            // initial popup size
-            popUpSize = new Point
-            {
-                X = (double)TryFindResource("PopupWidth"),
-                Y = (double)TryFindResource("PopupHeight")
-            };
-
-            CommandBindings.Add(new CommandBinding(ShowFilter, ShowFilterCommand, CanShowFilter));
-            CommandBindings.Add(new CommandBinding(ApplyFilter, ApplyFilterCommand, CanApplyFilter)); // Ok
-            CommandBindings.Add(new CommandBinding(CancelFilter, CancelFilterCommand));
-            CommandBindings.Add(new CommandBinding(RemoveFilter, RemoveFilterCommand, CanRemoveFilter));
-            CommandBindings.Add(new CommandBinding(IsChecked, CheckedAllCommand));
-            CommandBindings.Add(new CommandBinding(ClearSearchBox, ClearSearchBoxClick));
-        }
-
-        #endregion Public Constructors
 
         #region Public Events
 
@@ -567,7 +566,7 @@ namespace FilterDataGrid
 
                         // change the state( IsChecked = false) in items that have not changed (state)
                         foreach (var item in changed.Where(c => !c.IsChanged && c.IsChecked))
-                            item.Initialize = false;  // initialize don't raise OnPropertyChanged
+                            item.Initialize = false; // initialize don't raise OnPropertyChanged
                     }
                     else
                     {
@@ -791,15 +790,11 @@ namespace FilterDataGrid
         {
             // CanExecute only when the popup is open
             if ((popup?.IsOpen ?? false) == false)
-            {
                 e.CanExecute = false;
-            }
             else
-            {
                 e.CanExecute = search
                     ? CommonItemsView.Any()
                     : CommonItemsView.Any(c => c.IsChecked) && CommonItemsView.Any(c => c.IsChanged);
-            }
         }
 
         /// <summary>
@@ -847,10 +842,8 @@ namespace FilterDataGrid
 
             if (item.Level == 0)
                 foreach (var element in CommonItemsView.Where(f => f.IsChecked != item.IsChecked))
-                {
                     // exclude event
                     element.IsChecked = item.IsChecked;
-                }
         }
 
         /// <summary>
@@ -947,7 +940,7 @@ namespace FilterDataGrid
         }
 
         /// <summary>
-        /// Generate list of current field values using for loop
+        ///     Generate list of current field values using "for" loop
         /// </summary>
         /// <param name="fieldProperty"></param>
         /// <returns></returns>
@@ -1019,7 +1012,7 @@ namespace FilterDataGrid
                 }
 
                 resultList = dico //.AsParallel().OrderBy(x => x.Key.ToString())
-                    .Select((c, i) => new FilterItem
+                    .Select(c => new FilterItem
                     {
                         GroupIndex = c.Value[0].IsChecked
                             ? c.Value[0].CheckedIndex.ToArray()
@@ -1044,12 +1037,13 @@ namespace FilterDataGrid
             return resultList;
         }
 
-        // ReSharper disable once UnusedMember.Local
+        
         /// <summary>
-        ///  Generate list of current field values using while loop
+        ///     Generate list of current field values using "while" loop
         /// </summary>
         /// <param name="fieldProperty"></param>
         /// <returns></returns>
+        // ReSharper disable once UnusedMember.Local
         private List<FilterItem> GetColumnValuesWhileLoop(PropertyInfo fieldProperty)
         {
             var watch = new Stopwatch();
@@ -1073,8 +1067,8 @@ namespace FilterDataGrid
                     if (filterManager.StackItems[index] || (isLastFilter && currentFilter.PreviousItems[index]))
                     {
                         var entry = isDate
-                             ? ((DateTime?)fieldProperty.GetValue(enumerator.Current, null))?.Date
-                             : fieldProperty.GetValue(enumerator.Current, null);
+                            ? ((DateTime?)fieldProperty.GetValue(enumerator.Current, null))?.Date
+                            : fieldProperty.GetValue(enumerator.Current, null);
 
                         var isChecked = filterManager.StackItems[index];
                         var isprevious = currentFilter.PreviousItems[index];
@@ -1123,18 +1117,18 @@ namespace FilterDataGrid
                 }
 
                 resultList = dico.AsParallel().OrderBy(x => x.Key.ToString())
-                            .Select((c, i) => new FilterItem
-                            {
-                                GroupIndex = c.Value[0].IsChecked
-                                    ? c.Value[0].CheckedIndex.ToArray()
-                                    : c.Value[0].PreviousIndex.ToArray(),
-                                Initialize = c.Value[0].IsChecked,
-                                IsPrevious = c.Value[0].IsPrevious,
-                                Content = c.Value[0].IsNull ? null : c.Value[0].Content,
-                                FieldType = fieldType,
-                                Level = 1
-                            })
-                            .ToList();
+                    .Select(c => new FilterItem
+                    {
+                        GroupIndex = c.Value[0].IsChecked
+                            ? c.Value[0].CheckedIndex.ToArray()
+                            : c.Value[0].PreviousIndex.ToArray(),
+                        Initialize = c.Value[0].IsChecked,
+                        IsPrevious = c.Value[0].IsPrevious,
+                        Content = c.Value[0].IsNull ? null : c.Value[0].Content,
+                        FieldType = fieldType,
+                        Level = 1
+                    })
+                    .ToList();
 
                 watch.Display("GetColumnValues While Loop Final List", IsDebugModeOn);
             }
@@ -1146,6 +1140,7 @@ namespace FilterDataGrid
 
             return resultList;
         }
+
         /// <summary>
         ///     OnPropertyChange
         /// </summary>
@@ -1436,32 +1431,18 @@ namespace FilterDataGrid
 
             if (string.IsNullOrEmpty(searchText) || item == null || item.Level == 0) return true;
 
-            bool result;
+            var content = Convert.ToString(item.Content, Translate.Culture);
 
             // Contains
             if (!StartsWith)
-            {
-                result = item.FieldType == typeof(DateTime)
-                    ? ((DateTime?)item.Content)?.ToString(DateFormatString, Translate.Culture)
-                    .IndexOf(searchText, ordinalIgnoreCase) >= 0
-                    : item.Content?.ToString()?.IndexOf(searchText, ordinalIgnoreCase) >= 0;
-
-                //Debug.WriteLine($"item : {item?.Content,-10} {item?.Level,-4} {result,-8} StartsWith :{StartsWith}");
-                return result;
-            }
+                return Translate.Culture.CompareInfo.IndexOf(content ?? string.Empty, searchText,
+                    CompareOptions.OrdinalIgnoreCase) >= 0;
 
             // StartsWith preserve RangeOverflow
             if (searchLength > item.ContentLength) return false;
 
-            result = item.FieldType == typeof(DateTime)
-                ? ((DateTime?)item.Content)?.ToString(DateFormatString, Translate.Culture)
-                .IndexOf(searchText, 0, searchLength, ordinalIgnoreCase) >= 0
-                : item.Content?.ToString()?.IndexOf(searchText, 0, searchLength, ordinalIgnoreCase) >=
-                  0;
-
-            //Debug.WriteLine($"item : {item?.Content, -10} {item?.Level, -4} {result, -8} StartsWith :{StartsWith}");
-
-            return result;
+            return Translate.Culture.CompareInfo.IndexOf(content ?? string.Empty, searchText, 0, searchLength,
+                CompareOptions.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>
