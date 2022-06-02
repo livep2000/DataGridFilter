@@ -1,9 +1,13 @@
-﻿// Author     : Gilles Macabies
-// Solution   : DataGridFilter
-// Projet     : DataGridFilter
+﻿#region (c) 2022 Gilles Macabies All right reserved
+
+// Author     : Gilles Macabies
+// Solution   : FilterDataGrid
+// Projet     : FilterDataGrid.Net5.0
 // File       : FilterHelpers.cs
-// Created    : 20/01/2021
-//
+// Created    : 30/05/2022
+// 
+
+#endregion
 
 using System;
 using System.Collections.Generic;
@@ -24,21 +28,6 @@ using System.Windows.Media;
 
 namespace FilterDataGrid
 {
-    public static class CollectionExtentions
-    {
-        #region Public Methods
-
-        public static void DisposeSequence<T>(this IEnumerable<T> source)
-        {
-            foreach (IDisposable disposableObject in source.OfType<IDisposable>())
-            {
-                disposableObject.Dispose();
-            };
-        }
-
-        #endregion Public Methods
-    }
-
     public static class Extensions
     {
         #region Public Methods
@@ -70,21 +59,21 @@ namespace FilterDataGrid
     }
 
     /// <summary>
-    /// ScrollBar to Top
-    /// https://itecnote.com/tecnote/r-wpf-reset-listbox-scroll-position-when-itemssource-changes/
+    ///     ScrollBar to Top
+    ///     https://itecnote.com/tecnote/r-wpf-reset-listbox-scroll-position-when-itemssource-changes/
     /// </summary>
     public static class ScrollToTopBehavior
     {
         #region Public Fields
 
         public static readonly DependencyProperty ScrollToTopProperty =
-        DependencyProperty.RegisterAttached
-        (
-            "ScrollToTop",
-            typeof(bool),
-            typeof(ScrollToTopBehavior),
-            new UIPropertyMetadata(false, OnScrollToTopPropertyChanged)
-        );
+            DependencyProperty.RegisterAttached
+            (
+                "ScrollToTop",
+                typeof(bool),
+                typeof(ScrollToTopBehavior),
+                new UIPropertyMetadata(false, OnScrollToTopPropertyChanged)
+            );
 
         #endregion Public Fields
 
@@ -106,7 +95,7 @@ namespace FilterDataGrid
 
         private static void ItemsSourceChanged(object o, EventArgs eArgs)
         {
-            ItemsControl itemsControl = o as ItemsControl;
+            var itemsControl = o as ItemsControl;
 
             if (itemsControl == null) return;
 
@@ -114,7 +103,7 @@ namespace FilterDataGrid
             {
                 if (itemsControl.ItemContainerGenerator.Status == GeneratorStatus.ContainersGenerated)
                 {
-                    ScrollViewer scrollViewer = itemsControl.FindVisualChild<ScrollViewer>();
+                    var scrollViewer = itemsControl.FindVisualChild<ScrollViewer>();
                     scrollViewer.ScrollToTop();
                     itemsControl.ItemContainerGenerator.StatusChanged -= EventHandler;
                 }
@@ -125,23 +114,19 @@ namespace FilterDataGrid
 
         private static void OnScrollToTopPropertyChanged(DependencyObject dpo, DependencyPropertyChangedEventArgs e)
         {
-            ItemsControl itemsControl = dpo as ItemsControl;
+            var itemsControl = dpo as ItemsControl;
 
             if (itemsControl != null)
             {
-                DependencyPropertyDescriptor dependencyPropertyDescriptor =
-                        DependencyPropertyDescriptor.FromProperty(ItemsControl.ItemsSourceProperty, typeof(ItemsControl));
+                var dependencyPropertyDescriptor =
+                    DependencyPropertyDescriptor.FromProperty(ItemsControl.ItemsSourceProperty, typeof(ItemsControl));
 
                 if (dependencyPropertyDescriptor != null)
                 {
                     if ((bool)e.NewValue)
-                    {
                         dependencyPropertyDescriptor.AddValueChanged(itemsControl, ItemsSourceChanged);
-                    }
                     else
-                    {
                         dependencyPropertyDescriptor.RemoveValueChanged(itemsControl, ItemsSourceChanged);
-                    }
                 }
             }
         }
@@ -317,7 +302,7 @@ namespace FilterDataGrid
         }
 
         public static T FindVisualChild<T>(this DependencyObject dependencyObject, string name)
-                                                            where T : DependencyObject
+            where T : DependencyObject
         {
             // Search immediate children first (breadth-first)
             var childrenCount = VisualTreeHelper.GetChildrenCount(dependencyObject);
@@ -413,7 +398,8 @@ namespace FilterDataGrid
 
         #region Private Methods
 
-        private static IEnumerable<T> GetChildrenOf<T>(this DependencyObject obj, bool recursive) where T : DependencyObject
+        private static IEnumerable<T> GetChildrenOf<T>(this DependencyObject obj, bool recursive)
+            where T : DependencyObject
         {
             var count = VisualTreeHelper.GetChildrenCount(obj);
             for (var i = 0; i < count; i++)
@@ -474,7 +460,7 @@ namespace FilterDataGrid
     }
 
     /// <summary>
-    /// Attached Property "FilterState" to Filter Button
+    ///     Attached Property "FilterState" to Filter Button
     /// </summary>
     public class FilterState : DependencyObject
     {

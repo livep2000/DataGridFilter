@@ -5,7 +5,7 @@
 // Projet     : FilterDataGrid.Net5.0
 // File       : FilterDataGrid.cs
 // Created    : 30/05/2022
-// 
+//
 
 #endregion
 
@@ -68,6 +68,7 @@ namespace FilterDataGrid
             CommandBindings.Add(new CommandBinding(RemoveFilter, RemoveFilterCommand, CanRemoveFilter));
             CommandBindings.Add(new CommandBinding(IsChecked, CheckedAllCommand));
             CommandBindings.Add(new CommandBinding(ClearSearchBox, ClearSearchBoxClick));
+            CommandBindings.Add(new CommandBinding(RemoveAllFilter, RemoveAllFilterCommand, CanRemoveAllFilter));
         }
 
         #endregion Public Constructors
@@ -79,6 +80,8 @@ namespace FilterDataGrid
         public static readonly ICommand CancelFilter = new RoutedCommand();
 
         public static readonly ICommand ClearSearchBox = new RoutedCommand();
+
+        public static readonly ICommand RemoveAllFilter = new RoutedCommand();
 
         /// <summary>
         ///     date format displayed
@@ -530,6 +533,50 @@ namespace FilterDataGrid
         #endregion Protected Methods
 
         #region Private Methods
+
+        /// <summary>
+        /// Can Remove AllFilter
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void CanRemoveAllFilter(object sender, CanExecuteRoutedEventArgs e)
+        {
+            e.CanExecute = filterManager?.Queue.Count > 0;
+        }
+
+        /// <summary>
+        /// Remove All Filter
+        /// </summary>
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        private void RemoveAllFilterCommand(object sender, ExecutedRoutedEventArgs e)
+        {
+            try
+            {
+                filterManager = new FilterManager(ItemsSourceCount);
+                DatagridCollectionView?.Refresh();
+
+                foreach (var col in Columns)
+                {
+                    if (col is DataGridTextColumn ctxt && ctxt.IsColumnFiltered)
+                        fieldName = ctxt.FieldName;
+
+                    if (col is DataGridTemplateColumn ctpl && ctpl.IsColumnFiltered)
+                        fieldName = ctpl.FieldName;
+
+                    button = VisualTreeHelpers.GetHeader(col, this)
+                        ?.FindVisualChild<Button>("FilterButton");
+
+                    if (button != null)
+                        FilterState.SetIsFiltered(button, false);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"FilterDataGrid.RemoveAllFilterCommand error : {ex.Message}");
+                throw;
+            }
+        }
 
         /// <summary>
         ///     Click OK Button when Popup is Open, apply filter
@@ -1037,7 +1084,6 @@ namespace FilterDataGrid
             return resultList;
         }
 
-        
         /// <summary>
         ///     Generate list of current field values using "while" loop
         /// </summary>
