@@ -76,12 +76,12 @@ namespace FilterDataGrid
         #region Public Fields
 
         public static readonly ICommand ApplyFilter = new RoutedCommand();
-
         public static readonly ICommand CancelFilter = new RoutedCommand();
-
         public static readonly ICommand ClearSearchBox = new RoutedCommand();
-
+        public static readonly ICommand IsChecked = new RoutedCommand();
         public static readonly ICommand RemoveAllFilter = new RoutedCommand();
+        public static readonly ICommand RemoveFilter = new RoutedCommand();
+
 
         /// <summary>
         ///     date format displayed
@@ -109,10 +109,6 @@ namespace FilterDataGrid
                 typeof(Local),
                 typeof(FilterDataGrid),
                 new PropertyMetadata(Local.English));
-
-        public static readonly ICommand IsChecked = new RoutedCommand();
-
-        public static readonly ICommand RemoveFilter = new RoutedCommand();
 
         /// <summary>
         ///     Show elapsed time in status bar
@@ -558,6 +554,8 @@ namespace FilterDataGrid
 
                 foreach (var col in Columns)
                 {
+                    // ReSharper disable once ConvertIfStatementToSwitchExpression
+                    // ReSharper disable once ConvertIfStatementToSwitchStatement
                     if (col is DataGridTextColumn ctxt && ctxt.IsColumnFiltered)
                         fieldName = ctxt.FieldName;
 
