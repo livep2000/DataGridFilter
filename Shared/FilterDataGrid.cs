@@ -23,9 +23,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Threading;
+
 // ReSharper disable RedundantArgumentDefaultValue
 
 namespace FilterDataGrid
@@ -411,9 +411,6 @@ namespace FilterDataGrid
                 // FilterLanguage : default : 0 (english)
                 Translate = new Loc { Language = FilterLanguage };
 
-                // Show row count
-                RowHeaderWidth = ShowRowsCount ? RowHeaderWidth > 0 ? RowHeaderWidth : double.NaN : 0;
-
                 // fill excluded Fields list with values
                 if (AutoGenerateColumns)
                     excludedFields = ExcludeFields.Split(',').Select(p => p.Trim()).ToList();
@@ -442,18 +439,15 @@ namespace FilterDataGrid
             try
             {
                 ElapsedTime = new TimeSpan(0, 0, 0);
+
                 // initialize FilterManager
                 filterManager = new FilterManager(Items.Count);
-
-                //Debug.WriteLine($"FilterDataGrid : {((IList)newValue).Count}");
-
-                //if (newValue == null || ((IList)newValue).Count == 0) return;
 
                 // clear ICollectionView
                 if (DatagridCollectionView != null)
                 {
-                    DatagridCollectionView = CollectionViewSource.GetDefaultView(new List());
-                    ItemCollectionView = CollectionViewSource.GetDefaultView(new List());
+                    DatagridCollectionView = CollectionViewSource.GetDefaultView(new Object());
+                    ItemCollectionView = CollectionViewSource.GetDefaultView(new Object());
                 }
 
                 DatagridCollectionView = CollectionViewSource.GetDefaultView(ItemsSource);
@@ -472,11 +466,10 @@ namespace FilterDataGrid
                         Text = ItemsSourceCount.ToString(),
                         FontSize = FontSize,
                         FontFamily = FontFamily,
-                        Margin = new Thickness(2.0)
+                        Padding = new Thickness(4.0)
                     };
                     txt.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                    RowHeaderSize = Math.Ceiling(txt.DesiredSize.Width);
-                    OnPropertyChanged(nameof(RowHeaderSize));
+                    RowHeaderWidth = Math.Ceiling(txt.DesiredSize.Width);
                 }
 
                 // get collection type
@@ -677,7 +670,7 @@ namespace FilterDataGrid
                 FilterState.SetIsFiltered(button, filterManager.CurrentFilter?.IsFiltered ?? false);
 
                 // clear collection
-                ItemCollectionView = CollectionViewSource.GetDefaultView(new List());
+                ItemCollectionView = CollectionViewSource.GetDefaultView(new Object());
 
                 // warning : it's necessary ?
                 filterManager.CurrentFilter = null;
@@ -700,7 +693,124 @@ namespace FilterDataGrid
             }
         }
 
-        private List<FilterItemDate> BuildTreeView(IEnumerable<FilterItem> dates)
+        private List<FilterItemDate> BuildTree(IEnumerable<FilterItem> dates)
+        {
+            try
+            {
+                var tree = new List<FilterItemDate>
+                {
+                    new FilterItemDate
+                    {
+                       Label = Translate.All, Level = 0, Initialize = true, FieldType = fieldType
+                    }
+                };
+
+                if (dates == null) return tree;
+
+                // iterate over all items that are not null
+                // INFO:
+                // Initialize   : does not call the SetIsChecked method
+                // IsChecked    : call the SetIsChecked method
+                // (see the FilterItem class for more informations)
+
+                var dateTimes = dates.ToList();
+
+                foreach (var y in dateTimes.Where(c => c.Level == 1)
+                             .Select(filterItem => new
+                             {
+                                 ((DateTime)filterItem.Content).Date,
+                                 Item = filterItem
+                             })
+                             .GroupBy(g => g.Date.Year)
+                             .Select(year => new FilterItemDate
+                             {
+                                 Level = 1,
+                                 Content = year.Key,
+                                 Label = year.FirstOrDefault()?.Date.ToString("yyyy", Translate.Culture),
+                                 Initialize = true, // default state
+                                 FieldType = fieldType,
+
+                                 Children = year.GroupBy(date => date.Date.Month)
+                                     .Select(month => new FilterItemDate
+                                     {
+                                         Level = 2,
+                                         Content = month.Key,
+                                         Label = month.FirstOrDefault()?.Date.ToString("MMMM", Translate.Culture),
+                                         Initialize = true, // default state
+                                         FieldType = fieldType,
+
+                                         Children = month.GroupBy(date => date.Date.Day)
+                                             .Select(day => new FilterItemDate
+                                             {
+                                                 Level = 3,
+                                                 Content = day.Key,
+                                                 Label = day.FirstOrDefault()?.Date.ToString("dd", Translate.Culture),
+                                                 Initialize = true, // default state
+                                                 FieldType = fieldType,
+
+                                                 // filter Item linked to the day, it propagates the status changes
+                                                 Item = day.FirstOrDefault()?.Item,
+
+                                                 Children = new List<FilterItemDate>()
+                                             }).ToList()
+                                     }).ToList()
+                             }))
+                {
+                    // set parent and IsChecked property if uncheck Previous items
+                    y.Children.ForEach(m =>
+                    {
+                        m.Parent = y;
+
+                        m.Children.ForEach(d =>
+                        {
+                            d.Parent = m;
+
+                            // set the state of the "IsChecked" property based on the items already filtered (unchecked)
+                            if (d.Item.IsChecked) return;
+
+                            // call the SetIsChecked method of the FilterItemDate class
+                            d.IsChecked = false;
+
+                            // reset with new state (isChanged == false)
+                            d.Initialize = d.IsChecked;
+                        });
+                        // reset with new state
+                        m.Initialize = m.IsChecked;
+                    });
+                    // reset with new state
+                    y.Initialize = y.IsChecked;
+                    tree.Add(y);
+                }
+                // last empty item if exist in collection
+                if (dateTimes.Any(d => d.Level == -1))
+                {
+                    var empty = dateTimes.FirstOrDefault(x => x.Level == -1);
+                    if (empty != null)
+                        tree.Add(
+                            new FilterItemDate
+                            {
+                                Label = Translate.Empty, // translation
+                                Content = null,
+                                Level = -1,
+                                FieldType = fieldType,
+                                Initialize = empty.IsChecked,
+                                Item = empty,
+                                Children = new List<FilterItemDate>()
+                            }
+                        );
+                }
+                tree.First().Tree = tree;
+                return tree;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"FilterCommon.BuildTree : {ex.Message}");
+                throw;
+            }
+        }
+
+        // ReSharper disable once UnusedMember.Local
+        private List<FilterItemDate> Build_TreeView(IEnumerable<FilterItem> dates)
         {
             var watch = new Stopwatch();
             watch.Start();
@@ -735,7 +845,6 @@ namespace FilterDataGrid
                              {
                                  Level = 1,
                                  Label = $"{year.FirstOrDefault()?.Date:yyyy}",
-                                 // + $" - {string.Join(" ", year.FirstOrDefault()?.GroupIndex ?? new List<int>())}",
                                  GroupIndex = Array.Empty<int>(),
                                  Content = year.Key,
                                  Initialize = true,
@@ -745,7 +854,6 @@ namespace FilterDataGrid
                                      {
                                          Level = 2,
                                          Label = $"{month.FirstOrDefault()?.Date:MMMM}",
-                                         // + $"- {string.Join(" ", month.FirstOrDefault()?.GroupIndex ?? new List<int>())}",
                                          GroupIndex = Array.Empty<int>(),
                                          Content = month.Key,
                                          Initialize = true,
@@ -755,7 +863,6 @@ namespace FilterDataGrid
                                              {
                                                  Level = 3,
                                                  Label = $"{day.FirstOrDefault()?.Date:dd}",
-                                                 // +$"- {string.Join(" , ", day.FirstOrDefault()?.GroupIndex ?? new List<int>())}",
                                                  GroupIndex = day.FirstOrDefault()?.GroupIndex,
                                                  Content = day.Key,
                                                  Initialize = true,
@@ -994,6 +1101,7 @@ namespace FilterDataGrid
             var watch = new Stopwatch();
             watch.Start();
 
+
             if (!(ItemsSource is IList items)) return null;
 
             var currentFilter = filterManager.CurrentFilter;
@@ -1004,6 +1112,7 @@ namespace FilterDataGrid
 
             try
             {
+
                 for (var index = 0; index < items.Count; index++)
                 {
                     if (!filterManager.StackItems[index] &&
@@ -1044,7 +1153,8 @@ namespace FilterDataGrid
                             CheckedIndex = new List<int>(),
                             PreviousIndex = new List<int>(),
                             IsNull = key.Equals(string.Empty),
-                            Content = entry
+                            Level = key.Equals(string.Empty) ? -1 : 1,
+                            Content = key.Equals(string.Empty) ? null : entry
                         };
 
                         if (isChecked)
@@ -1056,7 +1166,7 @@ namespace FilterDataGrid
                     }
                 }
 
-                resultList = dico //.AsParallel().OrderBy(x => x.Key.ToString())
+                resultList = dico.AsParallel().OrderBy(x => x.Key.ToString())
                     .Select(c => new FilterItem
                     {
                         GroupIndex = c.Value[0].IsChecked
@@ -1064,11 +1174,12 @@ namespace FilterDataGrid
                             : c.Value[0].PreviousIndex.ToArray(),
                         Initialize = c.Value[0].IsChecked,
                         IsPrevious = c.Value[0].IsPrevious,
-                        Content = c.Value[0].IsNull ? null : c.Value[0].Content,
+                        Content = c.Value[0].Content,
+                        Level = c.Value[0].Level,
                         FieldType = fieldType,
-                        Level = 1
+                        
                     })
-                    .AsParallel().OrderBy(x => x.Content)
+                    //.AsParallel().OrderBy(x => x.Content)
                     .ToList();
 
                 watch.Display("GetColumnValues For Loop Final List", IsDebugModeOn);
@@ -1269,7 +1380,7 @@ namespace FilterDataGrid
             if (!pending)
             {
                 // clear resources
-                ItemCollectionView = CollectionViewSource.GetDefaultView(new List());
+                ItemCollectionView = CollectionViewSource.GetDefaultView(new Object());
 
                 TreeviewItems = new List<FilterItemDate>();
                 ListBoxItems = new List<FilterItem>();
@@ -1517,14 +1628,14 @@ namespace FilterDataGrid
             if (string.IsNullOrEmpty(searchText))
             {
                 // populate the tree with the original source items
-                TreeviewItems = BuildTreeView(CommonSourceItemsView);
+                TreeviewItems = BuildTree(CommonSourceItemsView);
             }
             else
             {
                 // populate the tree only with items found by the search when content is not null
                 // .Where(c => c.ContentLength > 0)
                 var items = CommonItemsView.ToList();
-                TreeviewItems = BuildTreeView(items.Any() ? items : null);
+                TreeviewItems = BuildTree(items.Any() ? items : null);
             }
         }
 
@@ -1537,6 +1648,7 @@ namespace FilterDataGrid
         {
             Debug.WriteLineIf(IsDebugModeOn, "\r\nShowFilterCommand");
 
+            ElapsedTime = new TimeSpan();
             // reset previous elapsed time
             stopWatchFilter = Stopwatch.StartNew();
 
@@ -1654,7 +1766,7 @@ namespace FilterDataGrid
                     commonItemList.AddRange(filterItemList);
 
                     // fill the treeview with BuildTreeView
-                    TreeviewItems = BuildTreeView(filterItemList);
+                    TreeviewItems = BuildTree(filterItemList);
                 }
                 else
                 {

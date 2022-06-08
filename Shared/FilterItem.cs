@@ -39,6 +39,7 @@ namespace FilterDataGrid
         public bool IsNull { get; set; }
         public bool IsPrevious { get; set; }
         public List<int> PreviousIndex { get; set; }
+        public int Level { get; set; }
 
         #endregion Public Properties
     }
@@ -60,7 +61,7 @@ namespace FilterDataGrid
 
         public object Content { get; set; }
 
-        public int ContentLength => Content?.ToString().Length ?? 0;
+        public int ContentLength => Content?.ToString()?.Length ?? 0;
 
         public Type FieldType { get; set; }
 
