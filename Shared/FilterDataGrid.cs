@@ -152,6 +152,8 @@ namespace FilterDataGrid
 
         private Button button;
 
+        private DataGridColumnHeadersPresenter columnHeadersPresenter;
+
         private Type collectionType;
 
         private Cursor cursor;
@@ -329,15 +331,25 @@ namespace FilterDataGrid
             }
         }
 
+        public Type FieldType
+        {
+            get => fieldType;
+            set
+            {
+                fieldType = value;
+                OnPropertyChanged("FieldType");
+            }
+        }
+
         #endregion Public Properties
 
         #region Private Properties
 
         private IEnumerable<FilterItem> CommonItemsView =>
-            ItemCollectionView?.OfType<FilterItem>().Skip(1) ?? new List<FilterItem>();
+            ItemCollectionView?.OfType<FilterItem>().Where(c => c.Level != 0) ?? new List<FilterItem>();
 
         private IEnumerable<FilterItem> CommonSourceItemsView =>
-            ItemCollectionView?.SourceCollection.OfType<FilterItem>().Skip(1) ?? new List<FilterItem>();
+            ItemCollectionView?.SourceCollection.OfType<FilterItem>().Where(c => c.Level != 0) ?? new List<FilterItem>();
 
         private ICollectionView DatagridCollectionView { get; set; }
 
@@ -546,13 +558,24 @@ namespace FilterDataGrid
 
                 foreach (var col in Columns)
                 {
-                    // ReSharper disable once ConvertIfStatementToSwitchExpression
-                    // ReSharper disable once ConvertIfStatementToSwitchStatement
-                    if (col is DataGridTextColumn ctxt && ctxt.IsColumnFiltered)
-                        fieldName = ctxt.FieldName;
+                    // ReSharper disable MergeIntoPattern
+                    switch (col)
+                    {
+                        case DataGridTextColumn ctxt when ctxt.IsColumnFiltered:
+                            fieldName = ctxt.FieldName;
+                            break;
 
-                    if (col is DataGridTemplateColumn ctpl && ctpl.IsColumnFiltered)
-                        fieldName = ctpl.FieldName;
+                        case DataGridTemplateColumn ctpl when ctpl.IsColumnFiltered:
+                            fieldName = ctpl.FieldName;
+                            break;
+
+                        case DataGridCheckBoxColumn chk when chk.IsColumnFiltered:
+                            fieldName = chk.FieldName;
+                            break;
+
+                        case null:
+                            continue;
+                    }
 
                     button = VisualTreeHelpers.GetHeader(col, this)
                         ?.FindVisualChild<Button>("FilterButton");
@@ -904,12 +927,16 @@ namespace FilterDataGrid
         {
             Debug.WriteLineIf(IsDebugModeOn, "GeneratingCustomColumn");
 
+            // ReSharper disable ConvertIfStatementToNullCoalescingAssignment
+            // ReSharper disable InvertIf
+
             try
             {
                 // get the columns that can be filtered
                 var columns = Columns
-                    .Where(c => (c is DataGridTextColumn dtx && dtx.IsColumnFiltered) ||
-                                (c is DataGridTemplateColumn dtp && dtp.IsColumnFiltered))
+                    .Where(c => (c is DataGridTextColumn dtx && dtx.IsColumnFiltered)
+                                || (c is DataGridTemplateColumn dtp && dtp.IsColumnFiltered)
+                                || (c is DataGridCheckBoxColumn dcb && dcb.IsColumnFiltered))
                     .Select(c => c)
                     .ToList();
 
@@ -953,10 +980,25 @@ namespace FilterDataGrid
 
                             column.FieldName = ((Binding)column.Binding).Path.Path;
                         }
-                        else if (columnType == typeof(DataGridTemplateColumn))
+
+                        if (columnType == typeof(DataGridTemplateColumn))
                         {
                             // DataGridTemplateColumn has no culture property
                             var column = (DataGridTemplateColumn)col;
+
+                            // template
+                            column.HeaderTemplate = (DataTemplate)TryFindResource("DataGridHeaderTemplate");
+                        }
+
+                        if (columnType == typeof(DataGridCheckBoxColumn))
+                        {
+                            // DataGridCheckBoxColumn has no culture property
+                            var column = (DataGridCheckBoxColumn)col;
+
+                            column.FieldName = ((Binding)column.Binding).Path.Path;
+
+                            if (((Binding)column.Binding).ConverterCulture == null)
+                                ((Binding)column.Binding).ConverterCulture = Translate.Culture;
 
                             // template
                             column.HeaderTemplate = (DataTemplate)TryFindResource("DataGridHeaderTemplate");
@@ -1287,7 +1329,9 @@ namespace FilterDataGrid
             //GC.Collect();
 
             // re-enable datagrid
-            IsEnabled = true;
+            // IsEnabled = true;
+            if (columnHeadersPresenter != null)
+                columnHeadersPresenter.IsEnabled = true;
         }
 
         /// <summary>
@@ -1548,17 +1592,19 @@ namespace FilterDataGrid
 
                 // then down to the current popup
                 popup = VisualTreeHelpers.FindChild<Popup>(header, "FilterPopup");
+                columnHeadersPresenter = VisualTreeHelpers.FindAncestor<DataGridColumnHeadersPresenter>(header);
 
-                if (popup == null) return;
+                if (popup == null || columnHeadersPresenter == null) return;
+
+                // disable columnHeadersPresenter while popup is open
+                if (columnHeadersPresenter != null)
+                    columnHeadersPresenter.IsEnabled = false;
 
                 // popup handle event
                 popup.Closed += PopupClosed;
 
                 // disable popup background clickthrough, contribution : WORDIBOI
                 popup.MouseDown += onMousedown;
-
-                // disable datagrid while popup is open
-                IsEnabled = false;
 
                 // resizable grid
                 sizableContentGrid = VisualTreeHelpers.FindChild<Grid>(popup.Child, "SizableContentGrid");
@@ -1600,30 +1646,33 @@ namespace FilterDataGrid
                     fieldName = column.FieldName;
                 }
 
+                if (columnType == typeof(DataGridCheckBoxColumn))
+                {
+                    var column = (DataGridCheckBoxColumn)header.Column;
+                    fieldName = column.FieldName;
+                }
+
                 // invalid fieldName
                 if (string.IsNullOrEmpty(fieldName)) return;
 
                 // get type of field
-                fieldType = null;
+                FieldType = null;
                 var fieldProperty = collectionType.GetProperty(fieldName);
 
                 // get type or underlying type if nullable
                 if (fieldProperty != null)
-                    fieldType = Nullable.GetUnderlyingType(fieldProperty.PropertyType) ?? fieldProperty.PropertyType;
+                    FieldType = Nullable.GetUnderlyingType(fieldProperty.PropertyType) ?? fieldProperty.PropertyType;
 
-                if (fieldType == null) return;
+                if (FieldType == null) return;
 
                 // if current is not in filterManager, create
                 filterManager.SetCurrent(fieldName, fieldType);
 
                 if (filterManager.CurrentFilter == null) return;
 
-                // disable sorting
-                Sorted -= OnSorted;
-
-                var filterItemList = new List<FilterItem>();
-
                 Mouse.OverrideCursor = Cursors.Wait;
+
+                List<FilterItem> filterItemList = null;
 
                 await Task.Run(() =>
                 {
@@ -1634,14 +1683,25 @@ namespace FilterDataGrid
                     });
                 });
 
-                var commonItemList = new List<FilterItem>
-                {
-                    new FilterItem { Content = "(Select All)", Initialize = true, Level = 0 }
-                };
+                var commonItemList = new List<FilterItem>(filterItemList.Count + 2);
 
-                // TreeView
+                if (fieldType == typeof(bool))
+                {
+                    // translate boolean content, two items
+                    filterItemList.ToList().ForEach(c =>
+                    {
+                        c.Content = (bool)c.Content ? Translate.IsTrue : Translate.IsFalse;
+                    });
+                }
+                else
+                {
+                    // add item (Select All) as first item
+                    commonItemList.Add(new FilterItem { Content = "(Select All)", Initialize = true, Level = 0 });
+                }
+
                 if (fieldType == typeof(DateTime))
                 {
+                    // TreeView ItemsSource
                     commonItemList.AddRange(filterItemList);
 
                     // fill the treeview with BuildTreeView
@@ -1649,11 +1709,12 @@ namespace FilterDataGrid
                 }
                 else
                 {
-                    // ListBox
+                    // ListBox ItemsSource
                     commonItemList.AddRange(filterItemList.Where(c => c.Content != null));
 
                     // add empty item
                     var empty = filterItemList.FirstOrDefault(c => c.Content == null);
+
                     if (empty != null)
                         commonItemList.Add(new FilterItem
                         {
@@ -1675,7 +1736,7 @@ namespace FilterDataGrid
                 if (ItemCollectionView.CanFilter) ItemCollectionView.Filter = SearchFilter;
 
                 // set the placement and offset of the PopUp in relation to the header and the main window of the application
-                // i.e (placement : bottom left or bottom right)
+                // i.e (placement relative to header : bottom left or bottom right)
                 PopupPlacement(sizableContentGrid, header);
 
                 popup.UpdateLayout();

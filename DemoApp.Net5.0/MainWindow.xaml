@@ -125,14 +125,14 @@
                     Header="Salary"
                     IsColumnFiltered="True" />
 
-                <control:DataGridTextColumn
-                    Binding="{Binding StartDate}"
-                    Header="Start Date"
+                <control:DataGridCheckBoxColumn
+                    Binding="{Binding Manager}"
+                    Header="Manager"
                     IsColumnFiltered="True" />
 
                 <control:DataGridTextColumn
-                    Binding="{Binding Manager}"
-                    Header="Manager"
+                    Binding="{Binding StartDate}"
+                    Header="Start Date"
                     IsColumnFiltered="True" />
 
             </control:FilterDataGrid.Columns>
