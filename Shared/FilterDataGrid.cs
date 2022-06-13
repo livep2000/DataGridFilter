@@ -1572,7 +1572,6 @@ namespace FilterDataGrid
 
             // reset previous elapsed time
             ElapsedTime = new TimeSpan(0, 0, 0);
-
             stopWatchFilter = Stopwatch.StartNew();
 
             try
@@ -1729,13 +1728,13 @@ namespace FilterDataGrid
                     ListBoxItems = commonItemList;
                 }
 
-                // Set ICollectionView for filtering in the pop-up window
+                // ICollectionView for filtering in the pop-up window
                 ItemCollectionView = CollectionViewSource.GetDefaultView(commonItemList);
 
-                // set filter in popup
+                // filter in popup
                 if (ItemCollectionView.CanFilter) ItemCollectionView.Filter = SearchFilter;
 
-                // set the placement and offset of the PopUp in relation to the header and the main window of the application
+                // Placement and offset of the PopUp in relation to the header and the main window of the application
                 // i.e (placement relative to header : bottom left or bottom right)
                 PopupPlacement(sizableContentGrid, header);
 
