@@ -11,3 +11,9 @@ This is an experimental fork. Please visit the original source at:
 
 <a href='https://github.com/macgile/DataGridFilter'>https://github.com/macgile/DataGridFilter</a>
 
+But if you are interrested, this is the goal:
+
+- Implementing DataGridcheckBoxColumn. (Done)
+- Implementing DataGridComboBoxColumn. (In test)
+- Implementing persistant filters.
+
