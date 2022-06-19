@@ -9,6 +9,7 @@
     <Import_RootNamespace>FilterDataGrid</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)Converters\FiltersJsonConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Converters\SolidBrushToColorConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Converters\StringFormatConverter.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DataGridColumn.cs" />
