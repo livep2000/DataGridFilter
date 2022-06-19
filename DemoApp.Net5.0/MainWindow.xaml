@@ -44,12 +44,29 @@
                     Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" />
 
                 <Button
-                    Width="100"
+                    Width="75"
                     Margin="20,0,0,0"
                     Padding="4"
                     Command="{Binding RefreshCommand}"
                     Content="Reset list"
                     Cursor="Hand" />
+                
+                <Button
+                    Width="75"
+                    Margin="20,0,0,0"
+                    Padding="4"
+                    Command="{Binding SaveFiltersCommand}"
+                    Content="Save filters"
+                    Cursor="Hand" />
+
+                <Button
+                    Width="75"
+                    Margin="20,0,0,0"
+                    Padding="4"
+                    Command="{Binding LoadFiltersCommand}"
+                    Content="Load filters"
+                    Cursor="Hand" />
+                
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal">
