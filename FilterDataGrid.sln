@@ -27,8 +27,8 @@ Global
 		{53CE2E6A-AE10-49AA-A9E6-A58728F86776}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{53CE2E6A-AE10-49AA-A9E6-A58728F86776}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{53CE2E6A-AE10-49AA-A9E6-A58728F86776}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B9D0F3B2-3921-4F75-A224-5DC84EE7D859}.Debug|Any CPU.ActiveCfg = Release|Any CPU
-		{B9D0F3B2-3921-4F75-A224-5DC84EE7D859}.Debug|Any CPU.Build.0 = Release|Any CPU
+		{B9D0F3B2-3921-4F75-A224-5DC84EE7D859}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9D0F3B2-3921-4F75-A224-5DC84EE7D859}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B9D0F3B2-3921-4F75-A224-5DC84EE7D859}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B9D0F3B2-3921-4F75-A224-5DC84EE7D859}.Release|Any CPU.Build.0 = Release|Any CPU
 		{03366D93-4240-4880-A847-2326A7C324C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
@@ -44,7 +44,6 @@ Global
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
 		Shared\Shared.projitems*{0a802a01-9adc-423c-a2c3-f296c585e718}*SharedItemsImports = 13
-		Shared\Shared.projitems*{1284f448-055d-49b6-9a1b-81e9bbf447c8}*SharedItemsImports = 4
 		Shared\Shared.projitems*{b9d0f3b2-3921-4f75-a224-5dc84ee7d859}*SharedItemsImports = 5
 	EndGlobalSection
 EndGlobal

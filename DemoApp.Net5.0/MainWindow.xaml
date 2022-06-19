@@ -55,7 +55,7 @@
                     Width="75"
                     Margin="20,0,0,0"
                     Padding="4"
-                    Command="{Binding SaveFiltersCommand}"
+                    Click="SaveFilterButton_Click"
                     Content="Save filters"
                     Cursor="Hand" />
 
@@ -63,7 +63,7 @@
                     Width="75"
                     Margin="20,0,0,0"
                     Padding="4"
-                    Command="{Binding LoadFiltersCommand}"
+                    Click="LoadFilterButton_Click"
                     Content="Load filters"
                     Cursor="Hand" />
                 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -64,6 +65,7 @@ namespace FilterDataGrid
                             while (reader.TokenType != JsonTokenType.EndArray)
                             {
                                 reader.Read();
+                                
                                 if (reader.TokenType == JsonTokenType.String && filterCommon.FieldType == typeof(DateTime))
                                 {
                                     string dateAsString = reader.GetString();
@@ -75,6 +77,7 @@ namespace FilterDataGrid
                                 else if (reader.TokenType == JsonTokenType.Number) filterCommon.PreviouslyFilteredItems.Add(reader.GetInt32());
                                 else if (reader.TokenType == JsonTokenType.True) filterCommon.PreviouslyFilteredItems.Add(true);
                                 else if (reader.TokenType == JsonTokenType.False) filterCommon.PreviouslyFilteredItems.Add(false);
+                                else if (reader.TokenType == JsonTokenType.Null) filterCommon.PreviouslyFilteredItems.Add(null);
                             }
                         }
                     }
@@ -105,7 +108,11 @@ namespace FilterDataGrid
 
                 foreach (object o in filterCommon.PreviouslyFilteredItems)
                 {
-                    if (dataType == DataType.String) writer.WriteStringValue(o.ToString());
+                    if (dataType == DataType.String)
+                    {
+                        if (o == null) writer.WriteNullValue();
+                        else writer.WriteStringValue(o.ToString());
+                    }
                     if (dataType == DataType.Integer) writer.WriteNumberValue(Convert.ToInt32(o));
                     if (dataType == DataType.Boolean) writer.WriteBooleanValue((bool)o);
                     if (dataType == DataType.DateTime)

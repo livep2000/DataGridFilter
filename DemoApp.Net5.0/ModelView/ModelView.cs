@@ -29,7 +29,7 @@ namespace DemoAppNet5.ModelView
     {
         #region Public Constructors
 
-        public ModelView(int i = 10_000)
+        public ModelView(int i = 5)
         {
             count = i;
             SelectedItem = count;

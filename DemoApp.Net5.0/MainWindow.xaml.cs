@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.Windows;
 
 namespace DemoAppNet5
 {
@@ -25,6 +26,16 @@ namespace DemoAppNet5
          DataContext = new ModelView.ModelView();
       }
 
-#endregion Public Constructors
-   }
+        #endregion Public Constructors
+        private void SaveFilterButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.FilterDataGrid.SaveFilters("filters.json");
+        }
+
+        private void LoadFilterButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.FilterDataGrid.LoadFilters( "filters.json");
+        }
+
+    }
 }

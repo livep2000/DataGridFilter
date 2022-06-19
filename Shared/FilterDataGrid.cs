@@ -65,10 +65,7 @@ namespace FilterDataGrid
             CommandBindings.Add(new CommandBinding(RemoveFilter, RemoveFilterCommand, CanRemoveFilter));
             CommandBindings.Add(new CommandBinding(IsChecked, CheckedAllCommand));
             CommandBindings.Add(new CommandBinding(ClearSearchBox, ClearSearchBoxClick));
-            CommandBindings.Add(new CommandBinding(RemoveAllFilter, RemoveAllFilterCommand, CanRemoveAllFilter));
-            CommandBindings.Add(new CommandBinding(SaveFilter, SaveFiltersCommand, CanSaveFilters));
-            CommandBindings.Add(new CommandBinding(LoadFilter, LoadFiltersCommand, CanLoadFilters));
-           
+            CommandBindings.Add(new CommandBinding(RemoveAllFilter, RemoveAllFilterCommand, CanRemoveAllFilter));  
         }
 
         #endregion Constructors
@@ -82,8 +79,7 @@ namespace FilterDataGrid
         public static readonly ICommand RemoveAllFilter = new RoutedCommand();
         public static readonly ICommand RemoveFilter = new RoutedCommand();
         public static readonly ICommand ShowFilter = new RoutedCommand();
-        public static readonly ICommand SaveFilter = new RoutedCommand();
-        public static readonly ICommand LoadFilter = new RoutedCommand();
+
         #endregion Command
 
         #region Public DependencyProperty
@@ -830,15 +826,7 @@ namespace FilterDataGrid
             e.CanExecute = CollectionViewSource?.CanFilter == true && (!popup?.IsOpen ?? true) && !pending;
         }
 
-        private void CanSaveFilters(object sender, CanExecuteRoutedEventArgs e)
-        {
-            e.CanExecute = GlobalFilterList.Count > 0;
-        }
-
-        private void CanLoadFilters(object sender, CanExecuteRoutedEventArgs e)
-        {
-            e.CanExecute = true;
-        }
+       
         /// <summary>
         ///     Check/uncheck all item when the action is (select all)
         /// </summary>
@@ -1073,23 +1061,7 @@ namespace FilterDataGrid
             RemoveCurrentFilter();
         }
 
-        private void SaveFiltersCommand(object sender, ExecutedRoutedEventArgs e)
-        {
-            // Get Json as string stored 'Somewhere' (File, database, settings)
-            string jsonString = System.IO.File.ReadAllText(this.Name + ".json");
-            // All data must be fully loaded to apply the filters
-            Dispatcher.Invoke(() => {
-                this.LoadFilters(jsonString);
-            }, DispatcherPriority.ApplicationIdle);
-        }
-
-        private void LoadFiltersCommand(object sender, ExecutedRoutedEventArgs e)
-        {
-            // Save filters
-            string jsonString = this.SaveFilters();
-            if (String.IsNullOrEmpty(jsonString))
-                System.IO.File.WriteAllText(this.Name + ".json", jsonString);
-        }
+       
             /// <summary>
             ///     Filter current list in popup
             /// </summary>
@@ -1589,77 +1561,136 @@ namespace FilterDataGrid
         #endregion Private Methods
 
         #region public Methods
-        public void LoadFilters(string jsonString)
-        {
-            if (String.IsNullOrEmpty(jsonString)) return;
-            // Remove current filtering ( if any applied )
-            //RemoveFilters();
-            RemoveAllFilterCommand(null, null);
 
-            /*
+       
+        public async void LoadFilters(string fileName = "filters.json")
+        {
+            Debug.WriteLine("Load filters");
+            stopWatchFilter.Start();
+            pending = true;
+            // Be sure all is comitted
+            _ = CommitEdit(DataGridEditingUnit.Row, true);
+            // Remove current filtering ( if any applied )
+            RemoveAllFilterCommand(null, null);
+           
+            string jsonString = System.IO.File.ReadAllText(fileName);
+            Debug.WriteLine(jsonString);
             // Apply converter
             JsonSerializerOptions serializeOptions = new JsonSerializerOptions();
             serializeOptions.Converters.Add(new FiltersJsonConverter());
             // Deserialize 
             List<FilterCommon> result = JsonSerializer.Deserialize<List<FilterCommon>>(jsonString, serializeOptions);
             if (result == null || result.Count == 0) return;
+           
             // Loop filters
             foreach (FilterCommon filter in result)
             {
-                // Find column by Fieldname
+                CurrentFilter = filter;
+                //Find column by Fieldname
                 var col = Columns
                   .Where(c => c is DataGridTextColumn dtx && dtx.IsColumnFiltered && dtx.FieldName == filter.FieldName ||
                   c is DataGridTemplateColumn dtp && dtp.IsColumnFiltered && dtp.FieldName == filter.FieldName ||
-                  c is DataGridCheckBoxColumn dtc && dtc.IsColumnFiltered && dtc.FieldName == filter.FieldName )
+                  c is DataGridCheckBoxColumn dtc && dtc.IsColumnFiltered && dtc.FieldName == filter.FieldName)
                   .Select(c => c)
-                  .First();
-                // Be sure all is comitted
-                _ = CommitEdit(DataGridEditingUnit.Row, true);
-                // Get columnHeader
-                //var header = VisualTreeHelpers.GetHeader(col, this);
-                //Debug.WriteLine("FounD!!! " + header.Content);
-                //var thisButton = header?.FindVisualChild<Button>();
-                // Set filterbutton and icon 
-                //if (thisButton != null)
-                //{
-                    //thisButton.Opacity = 1;
-                    //var thisPathFilterIcon = VisualTreeHelpers.FindChild<System.Windows.Shapes.Path>(thisButton, "PathFilterIcon");
-                    //if (thisPathFilterIcon != null)
-                    //{
-                        //thisPathFilterIcon.Data = iconFilterSet;
-                        // set this filter
-                        //button = thisButton;
-                        //pathFilterIcon = thisPathFilterIcon;
-                        CurrentFilter = filter;
-                        // Apply
-                        if (!CurrentFilter.IsFiltered)
-                        {
-                            CurrentFilter.AddFilter(criteria);
-                        }
-                        // add current filter to GlobalFilterList
-                        if (GlobalFilterList.All(f => f.FieldName != CurrentFilter.FieldName))
-                            GlobalFilterList.Add(CurrentFilter);
+                 .First();
 
-                        // set button icon (filtered or not)
-                        FilterState.SetIsFiltered(button, CurrentFilter?.IsFiltered ?? false); 
+                // Get Button by column -> Header -> button
+                var header = VisualTreeHelpers.GetHeader(col, this);
+                //Debug.WriteLine("FounD!!! " + header.Content);
+                var thisButton = header?.FindVisualChild<Button>();
+                if (thisButton != null) button = thisButton;
+                try
+                {
+                    await Task.Run(() =>
+                    {
+                        var previousFiltered = CurrentFilter.PreviouslyFilteredItems;
+                        bool blankIsUnchecked;
+
+                        // changed popup items
+                        var changedItems = PopupViewItems.Where(c => c.IsChanged).ToList();
+                        var checkedItems = changedItems.Where(c => c.IsChecked);
+                        var uncheckedItems = changedItems.Where(c => !c.IsChecked).ToList();
+                        // previous item except unchecked items checked again
+                        previousFiltered.ExceptWith(checkedItems.Select(c => c.Content));
+                        previousFiltered.UnionWith(uncheckedItems.Select(c => c.Content));
+                        blankIsUnchecked = uncheckedItems.Any(c => c.Level == -1);
+
+                        // two values, null and string.empty
+                        if (CurrentFilter.FieldType != typeof(DateTime) && previousFiltered.Any(c => c == null || c.ToString() == string.Empty))
+                        {
+                            //if (blank) item is unchecked, add string.Empty.
+                            // at this step, the null value is already added previously
+                            if (blankIsUnchecked) previousFiltered.Add(string.Empty);
+                            //if (blank) item is rechecked, remove string.Empty.
+                            else previousFiltered.RemoveWhere(item => item?.ToString() == string.Empty);
+                        }
+
+                        
+                        // add a filter if it is not already added previously
+                        if (!CurrentFilter.IsFiltered)CurrentFilter.AddFilter(criteria);
+                        
+                        //add current filter to GlobalFilterList
+
+                        // Why are there doubles in my list ???
+                     
+                        if (GlobalFilterList.All(f => f.FieldName != CurrentFilter.FieldName)) GlobalFilterList.Add(CurrentFilter);
+
+
+
+
                         // set the current field name as the last filter name
                         lastFilter = CurrentFilter.FieldName;
-                        // Refresh source to show changes
-                        CollectionViewSource.Refresh();
-                    //}
-                //}
+                    });
+
+                    // apply filter
+                    CollectionViewSource.Refresh();
+
+                    // remove the current filter if there is no items to filter
+                    if (!CurrentFilter.PreviouslyFilteredItems.Any()) RemoveCurrentFilter();
+
+                    // set button icon (filtered or not)
+                    FilterState.SetIsFiltered(button, CurrentFilter?.IsFiltered ?? false);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"FilterDataGrid.LoadFilters error : {ex.Message}");
+                    throw;
+                }
+                finally
+                {
+                    ItemCollectionView = System.Windows.Data.CollectionViewSource.GetDefaultView(new object());
+                    pending = false;
+                    CurrentFilter = null;
+                }
+               
             }
-            */
+               
+            stopWatchFilter.Stop();
+            ElapsedTime = stopWatchFilter.Elapsed;
+            Debug.WriteLineIf(DebugMode, $"FilterDataGrid.LoadFilters Elapsed time : {ElapsedTime:mm\\:ss\\.ff}");
+            
         }
-        public string SaveFilters()
+
+        public void SaveFilters(string fileName = "filters.json")
         {
+
+            Debug.WriteLine( "SaveFilters");
+            
             if (GlobalFilterList.Any<FilterCommon>())
             {
-                JsonSerializerOptions serializeOptions = new JsonSerializerOptions();
-                serializeOptions.Converters.Add(new FiltersJsonConverter());
-                return JsonSerializer.Serialize(GlobalFilterList, serializeOptions);
+                
+                try { 
+                    JsonSerializerOptions serializeOptions = new JsonSerializerOptions();
+                    serializeOptions.Converters.Add(new FiltersJsonConverter());   
+                    string jsonString = JsonSerializer.Serialize(GlobalFilterList, serializeOptions);
+                    System.IO.File.WriteAllText(fileName, jsonString);
+                }
+                catch (Exception e) 
+                {
+                    Debug.WriteLine(e.Message.ToString());
+                }
+                
             }
-            else return null;
         }
         #endregion
     }
