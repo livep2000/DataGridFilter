@@ -39,7 +39,9 @@ Refactoring and correction of logical errors.</PackageReleaseNotes>
     <PackageLicenseExpression></PackageLicenseExpression>
     <Title>A DataGrid control that implements filters for each column like Excel, automatically or custom generated.</Title>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageIcon>icon.png</PackageIcon>
+    <PackageIcon>Default.png</PackageIcon>
+    <ApplicationIcon>Resources\Icon1.ico</ApplicationIcon>
+    <NoWin32Manifest>true</NoWin32Manifest>
   </PropertyGroup>
 
   <!-- ReSharper disable once UnknownProperty -->
@@ -48,9 +50,14 @@ Refactoring and correction of logical errors.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="..\Default.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </Content>
     <None Include="..\LICENSE">
       <Pack>True</Pack>
       <PackagePath></PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="..\README.md">
       <Pack>True</Pack>
@@ -63,10 +70,18 @@ Refactoring and correction of logical errors.</PackageReleaseNotes>
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="icon.png">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
   </ItemGroup>
 
   <Import Project="..\Shared\Shared.projitems" Label="Shared" />
